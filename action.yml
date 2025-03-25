@@ -1,16 +1,40 @@
-name: 'Hello World JS Action'
-description: 'Greet someone and record the time'
-
+name: "SaaS Debuging"
+description: "Sends the failed build to AI"
 inputs:
-  who-to-greet:
-    description: 'Who to greet'
+  api_key:
+    description: "Please input your API key"
     required: true
-    default: 'World'
-
-outputs:
-  time:
-    description: 'The time we greeted you'
+  api_url:
+    description: "Please input your debuging API key"
+    required: true
+    default: "uvicorn server:app --host 0.0.0.0 --port 8000" #FIX THIS
+  
 
 runs:
-  using: 'node16'
-  main: 'index.js'
+  using: "composite"
+  steps:
+    - name: Capture the Logs
+      shell: bash
+      run: | 
+        echo "Your build failed, capturing logs..." 
+        mkdir -p logs
+        ./build_script.sh > logs/build.log 2>&1 || true
+    
+    # - name: Checkout the Client repo
+    #   using: actions/checkout@v2
+    #   with:
+    #     repository: ${{ inputs.github-url }}
+    #     token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Send to API
+      shell: bash
+      run: |
+        RESPONSE=$(curl -X POST -H "Content-Type: application/json" \
+        -d '{"api_key": "${{ inputs.api_key }}", "logs": "'"$(cat logs/build.log)"'"}' \
+        "${{ inputs.api_url }}")
+
+        echo "::group::Here is a method to fix your build"
+        echo "$RESPONSE"
+        echo "::endgroup::"
+
+  

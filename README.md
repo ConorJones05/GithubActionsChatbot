@@ -1,0 +1,1 @@
+issue had -> code and error pulled and system/tech stack -> error compared againt vector db -> links back to docs for issue -> prompt gpt with the code and the docs.
