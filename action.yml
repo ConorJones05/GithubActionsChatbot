@@ -36,5 +36,3 @@ runs:
         echo "::group::Here is a method to fix your build"
         echo "$RESPONSE"
         echo "::endgroup::"
-
-  

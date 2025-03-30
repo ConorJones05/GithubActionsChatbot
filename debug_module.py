@@ -1,13 +1,16 @@
 import os
 import re
 import openai
+from pinecone import Pinecone, ServerlessSpec
+
 
 openai.api_key = os.environ.get("OPENAI_KEY")
 client = openai
 
+
 def analyze(logs):
     return call_GPT_fix(parse_logs(logs))
-
+    
 
 def parse_logs(logs):
     logs_packet = f"Here are the logs {logs}. Here is the code for where the errors are occuring"
@@ -36,7 +39,19 @@ def parse_logs(logs):
     else:
         print("No traceback information found.")
 
-    return logs_packet
+    return logs_packet, file_line_matches
+
+def update_vector_fail():
+    pass
+
+def update_vector():
+    pass
+
+def compare_vector():
+    pass
+
+def custom_add():
+    pass
 
 
 def access_user_code(file_name, line_number, function_name=None):
@@ -50,7 +65,7 @@ def access_user_code(file_name, line_number, function_name=None):
         return f"Could not find file: {file_name}", ""
     
 
-def call_GPT_fix(logs_packet):
+def call_GPT_fix(logs_packet, custom_add = None):
     completion = client.chat.completions.create(
     model="gpt-4o",
     messages=[{

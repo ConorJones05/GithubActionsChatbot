@@ -2,26 +2,19 @@ from fastapi import FastAPI, HTTPException, Request
 import os
 import debug_module
 from supabase import create_client, Client
-import uuid
 import secrets
 import string
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import vector_logic
+import supabase_logic
 
 # curl -X POST -H "Content-Type: application/json" -d '{"api_key": "your_valid_api_key", "logs": "sample log data"}' http://0.0.0.0:8000/analyze
 
 # To test the signup endpoint:
 # curl -X POST -H "Content-Type: application/json" -d '{"user_email": "test@example.com", "user_password": "password123"}' http://0.0.0.0:8000/signup
 
-
-
-
-load_dotenv()
-
 app = FastAPI()
 
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
 
 
 def generate_api_key():
@@ -31,19 +24,22 @@ def generate_api_key():
 
 @app.post("/analyze")
 async def analyze_logs(request: Request):
+    #  Get data
     data = await request.json()
     api_key = data.get("api_key")
     logs = data.get("logs")
-    response = (
-        supabase.table("BuildSage")
-            .select("api_key")
-            .execute())
-    API_KEYS = [item['api_key'] for item in response.data]
+    supabase_logic.check_api_key(api_key=api_key)
+    if supabase_logic.free_user_check(api_key=api_key):
+        Exception("Your free trial of BuildSage has ended: Please wait 24 hours or buy a paid plan")
 
-    if False: #api_key not in API_KEYS:
-        raise HTTPException(status_code=403, detail="Invalid API key")
     
-    result = debug_module.analyze(logs)
+    result, issue = debug_module.parse_logs(logs)  #  Parsed (result) logs and individal error (issue)
+
+    if supabase_logic.check_last_log(api_key=api_key) and (supabase_logic.error_perfect(api_key=api_key, issue=issue) or vector_logic.predict_vector_cluster()):
+        pass
+
+
+    supabase_logic.update_user_logs(api_key=api_key, issue=issue)
     return {"analysis": result}
 
 
@@ -54,6 +50,6 @@ async def signup_user(user_info):
     password = data.get("user_password")
     api_key_gen = generate_api_key()
     try:
-        supabase.table("users").insert({"id": uuid.uuid4(), "user": user, "password": password, "api_key": api_key_gen}).execute()
+        supabase.table("users").insert({"user": user, "password": password, "api_key": api_key_gen}).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
