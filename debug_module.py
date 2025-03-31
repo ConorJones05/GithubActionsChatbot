@@ -15,9 +15,9 @@ def analyze(logs):
 def parse_logs(logs):
     logs_packet = f"Here are the logs {logs}. Here is the code for where the errors are occuring"
 
-    file_line_pattern = r'File "([^"]+)", line (\d+)'
+    file_line_pattern = r'File "([^"]+)", line (\d+)' #  Checks for Start with "set of chars"
 
-    traceback_pattern = r'File "([^"]+)", line (\d+), in (\S+)'
+    traceback_pattern = r'File "([^"]+)", line (\d+), in (\S+)' #  Checks for Start with "set of chars" and String without white spaces
 
     file_line_matches = re.findall(file_line_pattern, logs)
 
@@ -40,18 +40,6 @@ def parse_logs(logs):
         print("No traceback information found.")
 
     return logs_packet, file_line_matches
-
-def update_vector_fail():
-    pass
-
-def update_vector():
-    pass
-
-def compare_vector():
-    pass
-
-def custom_add():
-    pass
 
 
 def access_user_code(file_name, line_number, function_name=None):

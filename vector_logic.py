@@ -16,6 +16,7 @@ pc = Pinecone(api_key=os.environ.get("PINECONE_KEY"))
 
 
 def vector_embeddings(input):
+    """Turns a string into vector"""
     response = client.embeddings.create(
     input=input,
     model="text-embedding-3-small"
@@ -23,6 +24,7 @@ def vector_embeddings(input):
     return response.data[0].embedding
 
 def fix_tokens(string):
+    """If string has too amny tokens then it makes it shorter it"""
     completion = client.chat.completions.create(
     model="gpt-4o",
     messages=[{
@@ -34,7 +36,8 @@ def fix_tokens(string):
     return completion.choices[0].message.content
 
 
-def token_fixer(string, encoding_name):
+def token_checker(string, encoding_name):
+    """Changes the length of tokens to fit in vector"""
     DIMENSIONS = 1536
     encoding = tiktoken.get_encoding(encoding_name)
     tokens = encoding.encode(string)
@@ -45,6 +48,7 @@ def token_fixer(string, encoding_name):
 
 
 def clustering_classify(index_name="example-index1", n_clusters=8, sample_size=1000):
+    """Classifys each error for supabase"""
     index = pc.Index(index_name)
     
     fetch_response = index.fetch(ids=[], limit=sample_size)
@@ -77,6 +81,7 @@ def clustering_classify(index_name="example-index1", n_clusters=8, sample_size=1
     return result_df, kmeans
 
 def predict_vector_cluster(vector, index_name="example-index1", n_clusters=8, sample_size=1000):
+    """Preducts what the new vector would fit into"""
     _, kmeans_model = clustering_classify(index_name, n_clusters, sample_size)
     
     # Reshape for single sample prediction
@@ -88,6 +93,7 @@ def predict_vector_cluster(vector, index_name="example-index1", n_clusters=8, sa
     return int(cluster)
 
 def distance(vector, index_name="example-index1"):
+    """Find the diffrence between the new vector and the old vectors"""
     index = pc.Index(index_name)
     results = index.query(
         vector=vector,
@@ -113,6 +119,7 @@ def distance(vector, index_name="example-index1"):
     return retrieved_vectors
 
 def add_vector(index_name="example-index1", vector_id="id123", vector_values=None, metadata={}):
+    """add the vector to the pinecone """
     index = pc.Index(index_name)
     index.upsert(vectors=[
         {"id": vector_id, "values": vector_values, "metadata": metadata}
