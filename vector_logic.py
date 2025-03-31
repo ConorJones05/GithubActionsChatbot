@@ -1,20 +1,20 @@
-from openai import OpenAI
+import openai
 import tiktoken
 import numpy as np
 import pandas as pd
 from ast import literal_eval
-from pinecone.grpc import PineconeGRPC as Pinecone
-from pinecone import ServerlessSpec
-import time
+from pinecone import Pinecone
 import os
 from sklearn.cluster import KMeans
+from dotenv import load_dotenv
 
-#  https://platform.openai.com/docs/guides/embeddings#how-can-i-tell-how-many-tokens-a-string-has-before-i-embed-it 
+load_dotenv()
 
-client = OpenAI()
-pc = Pinecone(api_key=os.environ.get("PINECONE_KEY"))
+openai.api_key = os.environ.get("OPENAI_KEY")
+client = openai
 
-
+pc = Pinecone(api_key=os.environ.get("PINECONE_KEY")
+    )
 def vector_embeddings(input):
     """Turns a string into vector"""
     response = client.embeddings.create(
@@ -80,10 +80,16 @@ def clustering_classify(index_name="example-index1", n_clusters=8, sample_size=1
     
     return result_df, kmeans
 
-def predict_vector_cluster(vector, index_name="example-index1", n_clusters=8, sample_size=1000):
-    """Preducts what the new vector would fit into"""
+def predict_vector_cluster(vector=None, index_name="example-index1", n_clusters=8, sample_size=1000):
+    """Predicts what the new vector would fit into"""
+    if vector is None:
+        return False
+    
     _, kmeans_model = clustering_classify(index_name, n_clusters, sample_size)
     
+    if kmeans_model is None:
+        return False
+        
     # Reshape for single sample prediction
     vector_array = np.array(vector).reshape(1, -1)
     

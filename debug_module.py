@@ -2,7 +2,9 @@ import os
 import re
 import openai
 from pinecone import Pinecone, ServerlessSpec
+from dotenv import load_dotenv
 
+load_dotenv()
 
 openai.api_key = os.environ.get("OPENAI_KEY")
 client = openai
@@ -39,7 +41,10 @@ def parse_logs(logs):
     else:
         print("No traceback information found.")
 
-    return logs_packet, file_line_matches
+    result = logs_packet
+    issue = file_line_matches[0] if file_line_matches else None
+    
+    return result, issue
 
 
 def access_user_code(file_name, line_number, function_name=None):
@@ -48,20 +53,27 @@ def access_user_code(file_name, line_number, function_name=None):
             lines = file.readlines()
             start = max(0, int(line_number) - 3)
             end = min(len(lines), int(line_number) + 3)
-            return ''.join(lines[start:end]), lines[int(line_number) - 1].strip()
+            code_context = ''.join(lines[start:end])
+            error_line = lines[int(line_number) - 1].strip() if int(line_number) <= len(lines) else ""
+            return f"\nCode context for {file_name} around line {line_number}:\n{code_context}", error_line
     except FileNotFoundError:
-        return f"Could not find file: {file_name}", ""
+        return f"\nCould not find file: {file_name}\n", ""
+    except Exception as e:
+        return f"\nError accessing code: {str(e)}\n", ""
     
 
 def call_GPT_fix(logs_packet, custom_add = None):
+    logs_text, issue = logs_packet
+    content = logs_text
+    if custom_add:
+        content += f"\nAdditional context: {custom_add}"
+        
     completion = client.chat.completions.create(
     model="gpt-4o",
     messages=[{
         "role": "system",
-        "content": "You are an agent incharge of helping people fix there broken builds look these logs and code and find the error"
+        "content": "You are an agent in charge of helping people fix their broken builds. Analyze these logs and code to identify the error and provide a clear, step-by-step solution."
     }, {
         "role": "user",
-        "content": logs_packet}])
-    return completion.choices[0].message 
-
-
+        "content": content}])
+    return completion.choices[0].message
