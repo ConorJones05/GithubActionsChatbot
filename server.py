@@ -4,6 +4,7 @@ import vector_logic
 import supabase_logic
 import uuid
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ async def analyze_logs(request: Request):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     
     # Check if free user has exceeded limits
-    if supabase_logic.free_user_check(api_key=api_key):
+    if not supabase_logic.free_user_check(api_key=api_key):
         raise HTTPException(status_code=403, detail="Your free trial of BuildSage has ended: Please wait 24 hours or buy a paid plan")
 
     # Parse logs to extract error information
@@ -29,6 +30,20 @@ async def analyze_logs(request: Request):
     
     # Generate a unique ID for the error
     error_id = str(uuid.uuid4())
+    
+    # Extract file locations and line numbers to get additional code context
+    additional_context = ""
+    if issue:
+        file_name, line_number = issue
+        additional_context += debug_module.access_user_code(file_name, line_number)
+    
+    # Look for any other file references in the logs
+    file_line_pattern = r'File "([^"]+)", line (\d+)'
+    matches = re.findall(file_line_pattern, logs)
+    for match in matches:
+        if match != issue:  # Don't duplicate the primary issue
+            file_name, line_number = match
+            additional_context += debug_module.access_user_code(file_name, line_number)
     
     # Create vector embedding of the error logs
     try:
@@ -62,10 +77,10 @@ async def analyze_logs(request: Request):
                 "analysis": "This appears to be the same issue you encountered recently. Please review our previous recommendations.",
                 "error_id": error_id,
                 "is_duplicate": True
-            }
+            } #  Maybe fix this to give new repsonce
         
-        # Get AI analysis for the error
-        analysis = debug_module.analyze(logs)
+        # Get AI analysis for the error with additional context
+        analysis = debug_module.call_GPT_fix(logs_packet, additional_context)
         
         # Store the vector in the database for future reference
         metadata = {
@@ -88,7 +103,7 @@ async def analyze_logs(request: Request):
         
     except Exception as e:
         # Fallback to basic analysis if vector processing fails
-        analysis = debug_module.analyze(logs)
+        analysis = debug_module.call_GPT_fix(logs_packet, additional_context)
         supabase_logic.update_user_logs(api_key=api_key, issue=issue)
         return {
             "analysis": analysis.content,
@@ -98,14 +113,14 @@ async def analyze_logs(request: Request):
         }
 
 
-@app.post("/signup")
-async def signup_user(request: Request):
-    data = await request.json()
-    user = data.get("user_email")
-    password = data.get("user_password")
-    try:
-        api_key = supabase_logic.add_user(user, password)
-        return {"status": "success", "api_key": api_key}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+# @app.post("/signup")
+# async def signup_user(request: Request):
+#     data = await request.json()
+#     user = data.get("user_email")
+#     password = data.get("user_password")
+#     try:
+#         api_key = supabase_logic.add_user(user, password)
+#         return {"status": "success", "api_key": api_key}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 

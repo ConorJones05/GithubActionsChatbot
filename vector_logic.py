@@ -24,7 +24,7 @@ def vector_embeddings(input):
     return response.data[0].embedding
 
 def fix_tokens(string):
-    """If string has too amny tokens then it makes it shorter it"""
+    """If string has too many tokens then it makes it shorter it"""
     completion = client.chat.completions.create(
     model="gpt-4o",
     messages=[{

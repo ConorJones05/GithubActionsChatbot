@@ -54,12 +54,13 @@ def access_user_code(file_name, line_number, function_name=None):
             start = max(0, int(line_number) - 3)
             end = min(len(lines), int(line_number) + 3)
             code_context = ''.join(lines[start:end])
-            error_line = lines[int(line_number) - 1].strip() if int(line_number) <= len(lines) else ""
-            return f"\nCode context for {file_name} around line {line_number}:\n{code_context}", error_line
+            
+            function_detail = f" in function '{function_name}'" if function_name else ""
+            return f"\nCode context for {file_name} around line {line_number}{function_detail}:\n{code_context}"
     except FileNotFoundError:
-        return f"\nCould not find file: {file_name}\n", ""
+        return f"\nCould not find file: {file_name}\n"
     except Exception as e:
-        return f"\nError accessing code: {str(e)}\n", ""
+        return f"\nError accessing code: {str(e)}\n"
     
 
 def call_GPT_fix(logs_packet, custom_add = None):

@@ -1,0 +1,51 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      
+      - name: Build project
+        id: build
+        run: ./build_script.sh
+        continue-on-error: true
+      
+      - name: Debug with SaaS Debugging
+        if: ${{ failure() || steps.build.outcome == 'failure' }}
+        uses: conor/GithubActionsChatbot@main
+        with:
+          api_key: ${{ secrets.AI_API_KEY }}
+          api_url: "https://your-debug-api-endpoint.com/analyze"
+      
+      - name: Upload artifact
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-pages-artifact@v2
+        with:
+          # Upload the output of your build process
+          path: './build'
+      
+      - name: Deploy to GitHub Pages
+        if: steps.build.outcome == 'success'
+        id: deployment
+        uses: actions/deploy-pages@v2
