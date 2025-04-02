@@ -3,7 +3,7 @@ import tiktoken
 import numpy as np
 import pandas as pd
 from ast import literal_eval
-from pinecone import Pinecone
+import pinecone
 import os
 from sklearn.cluster import KMeans
 from dotenv import load_dotenv
@@ -13,8 +13,9 @@ load_dotenv()
 openai.api_key = os.environ.get("OPENAI_KEY")
 client = openai
 
-pc = Pinecone(api_key=os.environ.get("PINECONE_KEY")
-    )
+# Initialize Pinecone
+pinecone.init(api_key=os.environ.get("PINECONE_KEY"))
+
 def vector_embeddings(input):
     """Turns a string into vector"""
     response = client.embeddings.create(
@@ -49,7 +50,7 @@ def token_checker(string, encoding_name):
 
 def clustering_classify(index_name="example-index1", n_clusters=8, sample_size=1000):
     """Classifys each error for supabase"""
-    index = pc.Index(index_name)
+    index = pinecone.Index(index_name)
     
     fetch_response = index.fetch(ids=[], limit=sample_size)
     
@@ -100,7 +101,7 @@ def predict_vector_cluster(vector=None, index_name="example-index1", n_clusters=
 
 def distance(vector, index_name="example-index1"):
     """Find the diffrence between the new vector and the old vectors"""
-    index = pc.Index(index_name)
+    index = pinecone.Index(index_name)
     results = index.query(
         vector=vector,
         filter = {
@@ -126,7 +127,7 @@ def distance(vector, index_name="example-index1"):
 
 def add_vector(index_name="example-index1", vector_id="id123", vector_values=None, metadata={}):
     """add the vector to the pinecone """
-    index = pc.Index(index_name)
+    index = pinecone.Index(index_name)
     index.upsert(vectors=[
         {"id": vector_id, "values": vector_values, "metadata": metadata}
     ])
