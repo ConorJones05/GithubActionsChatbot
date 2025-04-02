@@ -26,11 +26,41 @@ runs:
     #     repository: ${{ inputs.github-url }}
     #     token: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Extract Code Context
+      shell: bash
+      run: |
+        mkdir -p code_context
+        # Extract file paths and line numbers from logs
+        grep -o 'File "[^"]*", line [0-9]*' logs/build.log | while read -r match; do
+          file_path=$(echo "$match" | grep -o 'File "[^"]*"' | sed 's/File "//;s/"$//')
+          line_num=$(echo "$match" | grep -o 'line [0-9]*' | sed 's/line //')
+          
+          if [ -f "$file_path" ]; then
+            # Extract context (3 lines before and after the error line)
+            start_line=$((line_num - 3))
+            if [ $start_line -lt 1 ]; then start_line=1; fi
+            end_line=$((line_num + 3))
+            
+            # Create a unique filename for this snippet
+            snippet_name=$(echo "$file_path" | sed 's/\//_/g')
+            echo "FILE: $file_path, LINE: $line_num" > "code_context/${snippet_name}_${line_num}.txt"
+            sed -n "${start_line},${end_line}p" "$file_path" >> "code_context/${snippet_name}_${line_num}.txt"
+          fi
+        done
+
     - name: Send to API
       shell: bash
       run: |
+        # Prepare code context data
+        CODE_CONTEXT=""
+        if [ -d "code_context" ] && [ "$(ls -A code_context)" ]; then
+          for snippet in code_context/*; do
+            CODE_CONTEXT="${CODE_CONTEXT}$(cat $snippet)\n\n"
+          done
+        fi
+        
         RESPONSE=$(curl -X POST -H "Content-Type: application/json" \
-        -d '{"api_key": "${{ inputs.api_key }}", "logs": "'"$(cat logs/build.log)"'"}' \
+        -d "{\"api_key\": \"${{ inputs.api_key }}\", \"logs\": \"$(cat logs/build.log)\", \"code_context\": \"${CODE_CONTEXT}\"}" \
         "${{ inputs.api_url }}")
 
         echo "::group::Here is a method to fix your build"

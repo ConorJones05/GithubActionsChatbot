@@ -16,13 +16,22 @@ async def health_check():
 
 @app.post("/analyze")
 async def analyze_logs(request: Request):
+    print("Received /analyze request")
     # Get data
-    data = await request.json()
-    api_key = data.get("api_key")
-    logs = data.get("logs")
+    try:
+        data = await request.json()
+        api_key = data.get("api_key")
+        logs = data.get("logs")
+        code_context = data.get("code_context", "")  # Get code context if provided
+        if not api_key or not logs:
+            print("ERROR: Missing required parameters (api_key or logs)")
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request format: {str(e)}")
     
     # Validate API key
-    if supabase_logic.check_api_key(api_key=api_key):
+    if not supabase_logic.check_api_key(api_key=api_key):
+        print(f"ERROR: Invalid API key {api_key[:5]}...")
         raise HTTPException(status_code=401, detail="Invalid API Key")
     
     # Check if free user has exceeded limits
@@ -30,7 +39,16 @@ async def analyze_logs(request: Request):
     #     raise HTTPException(status_code=403, detail="Your free trial of BuildSage has ended: Please wait 24 hours or buy a paid plan")
 
     # Parse logs to extract error information
-    logs_packet, issue = debug_module.parse_logs(logs)
+    try:
+        logs_packet, issue = debug_module.parse_logs(logs)
+        # Add code context to logs if available
+        if code_context:
+            if isinstance(logs_packet, tuple):
+                logs_packet = (logs_packet[0] + f"\n\nCode context from repository:\n{code_context}", logs_packet[1])
+            else:
+                logs_packet += f"\n\nCode context from repository:\n{code_context}"
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error parsing logs: {str(e)}")
     
     # Generate a unique ID for the error
     error_id = str(uuid.uuid4())
@@ -38,16 +56,13 @@ async def analyze_logs(request: Request):
     # Extract file locations and line numbers to get additional code context
     additional_context = ""
     if issue:
-        file_name, line_number = issue
-        additional_context += debug_module.access_user_code(file_name, line_number)
-    
-    # Look for any other file references in the logs
-    file_line_pattern = r'File "([^"]+)", line (\d+)'
-    matches = re.findall(file_line_pattern, logs)
-    for match in matches:
-        if match != issue:  # Don't duplicate the primary issue
-            file_name, line_number = match
-            additional_context += debug_module.access_user_code(file_name, line_number)
+        try:
+            file_name, line_number = issue            
+        except Exception as e:
+            print(f"Error extracting code context: {str(e)}")
+        
+    # Don't try to access user code locally - it won't be available
+    # additional_context += debug_module.access_user_code(file_name, line_number)
     
     # Create vector embedding of the error logs
     try:
@@ -63,12 +78,12 @@ async def analyze_logs(request: Request):
         # If the user has submitted logs recently, check if it's the same issue
         if supabase_logic.check_last_log(api_key=api_key):
             # Check both direct string matching and vector similarity
-            if supabase_logic.error_perfect(api_key=api_key, issue=issue):
+            if issue and supabase_logic.error_perfect(api_key=api_key, issue=issue):
                 is_similar = True
             else:
                 # Predict cluster for the current error
                 cluster = vector_logic.predict_vector_cluster(vector=error_vector)
-                if cluster is not False:  # Valid cluster prediction
+                if cluster is not False:
                     # Find similar errors in the database
                     similar_errors = vector_logic.distance(error_vector)
                     # Consider similar if similarity score is high
@@ -84,7 +99,7 @@ async def analyze_logs(request: Request):
             } #  Maybe fix this to give new repsonce
         
         # Get AI analysis for the error with additional context
-        analysis = debug_module.call_GPT_fix(logs_packet, additional_context)
+        analysis = debug_module.call_GPT_fix((logs_packet, issue), additional_context)
         
         # Store the vector in the database for future reference
         metadata = {
@@ -99,32 +114,24 @@ async def analyze_logs(request: Request):
         supabase_logic.update_user_logs(api_key=api_key, issue=issue)
         
         return {
-            "analysis": analysis.content,
+            "analysis": analysis,
             "error_id": error_id,
             "is_duplicate": False,
-            "similar_errors": similar_errors[:2] if similar_errors else []  # Return top 2 similar errors if any
+            "similar_errors": similar_errors[:2] if similar_errors else []
         }
         
     except Exception as e:
         # Fallback to basic analysis if vector processing fails
-        analysis = debug_module.call_GPT_fix(logs_packet, additional_context)
-        supabase_logic.update_user_logs(api_key=api_key, issue=issue)
-        return {
-            "analysis": analysis.content,
-            "error_id": error_id,
-            "is_duplicate": False,
-            "error_details": str(e)
-        }
-
-
-# @app.post("/signup")
-# async def signup_user(request: Request):
-#     data = await request.json()
-#     user = data.get("user_email")
-#     password = data.get("user_password")
-#     try:
-#         api_key = supabase_logic.add_user(user, password)
-#         return {"status": "success", "api_key": api_key}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        try:
+            analysis = debug_module.call_GPT_fix(logs_packet, additional_context)
+            supabase_logic.update_user_logs(api_key=api_key, issue=issue)
+            return {
+                "analysis": analysis,
+                "error_id": error_id,
+                "is_duplicate": False,
+                "error_details": str(e)
+            }
+        except Exception as e2:
+            print(f"ERROR in fallback analysis: {str(e2)}")
+            raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e2)}")
 
