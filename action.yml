@@ -13,6 +13,16 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Check and prepare build script
+      shell: bash
+      run: |
+        if [ ! -f "./build_script.sh" ]; then
+          echo "Creating build_script.sh as it does not exist"
+          echo "#!/bin/bash" > build_script.sh
+          echo "echo 'This is a placeholder build script'" >> build_script.sh
+        fi
+        chmod +x ./build_script.sh
+
     - name: Capture the Logs
       shell: bash
       run: | 
@@ -46,14 +56,18 @@ runs:
             echo "FILE: $file_path, LINE: $line_num" > "code_context/${snippet_name}_${line_num}.txt"
             sed -n "${start_line},${end_line}p" "$file_path" >> "code_context/${snippet_name}_${line_num}.txt"
           fi
-        done
+        done || true
 
     - name: Send to API
       shell: bash
       run: |
+        # Ensure logs directory and file exist
+        mkdir -p logs
+        touch logs/build.log
+        
         # Prepare code context data
         CODE_CONTEXT=""
-        if [ -d "code_context" ] && [ "$(ls -A code_context)" ]; then
+        if [ -d "code_context" ] && [ "$(ls -A code_context 2>/dev/null)" ]; then
           for snippet in code_context/*; do
             CODE_CONTEXT="${CODE_CONTEXT}$(cat $snippet)\n\n"
           done
