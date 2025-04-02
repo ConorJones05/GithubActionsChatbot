@@ -3,7 +3,7 @@ import tiktoken
 import numpy as np
 import pandas as pd
 from ast import literal_eval
-from pinecone import Pinecone, ServerlessSpec
+import pinecone  # Changed from 'from pinecone import Pinecone, ServerlessSpec'
 import os
 import logging
 from sklearn.cluster import KMeans
@@ -20,19 +20,14 @@ load_dotenv()
 
 # Initialize OpenAI
 openai.api_key = os.environ.get("OPENAI_KEY")
-if not openai.api_key:
-    logger.error("OpenAI API key not found! Application will not function correctly.")
-    raise EnvironmentError("OpenAI API key not configured")
+
 client = openai
 
 # Initialize Pinecone
 pinecone_key = os.environ.get("PINECONE_KEY")
-if not pinecone_key:
-    logger.error("Pinecone API key not found! Vector database functions will not work.")
-    raise EnvironmentError("Pinecone API key not configured")
 
 try:
-    pc = Pinecone(api_key=pinecone_key)
+    pinecone.init(api_key=pinecone_key, environment="us-west-2")
     logger.info("Pinecone initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Pinecone: {str(e)}")
@@ -90,7 +85,7 @@ def predict_vector_cluster(vector):
 def distance(vector):
     try:
         index_name = "github-actions-errors"
-        index = pc.Index(index_name)
+        index = pinecone.Index(index_name)
         
         # Query for similar vectors
         query_response = index.query(
@@ -100,11 +95,11 @@ def distance(vector):
         )
         
         similar_errors = []
-        for match in query_response.matches:
+        for match in query_response['matches']:  # In V1, results are in a dictionary
             similar_errors.append({
-                "id": match.id,
-                "score": match.score,
-                "metadata": match.metadata
+                "id": match['id'],
+                "score": match['score'],
+                "metadata": match['metadata']
             })
         
         logger.info(f"Found {len(similar_errors)} similar vectors")
@@ -119,31 +114,24 @@ def add_vector(vector_id, vector_values, metadata):
     try:
         # Check if the index exists, use a default index name
         index_name = "github-actions-errors"
-        indexes = pc.list_indexes()
+        indexes = pinecone.list_indexes()
         
-        if index_name not in [idx["name"] for idx in indexes]:
+        if index_name not in indexes:
             logger.info(f"Creating new index: {index_name}")
-            pc.create_index(
+            pinecone.create_index(
                 name=index_name,
                 dimension=len(vector_values),
-                metric="cosine",
-                spec=ServerlessSpec(
-                    cloud="aws",
-                    region="us-west-2"
-                )
+                metric="cosine"
+                # V1 doesn't use ServerlessSpec in the same way
             )
         
         # Get the index
-        index = pc.Index(index_name)
+        index = pinecone.Index(index_name)
         
         # Upsert the vector
         upsert_response = index.upsert(
             vectors=[
-                {
-                    "id": vector_id,
-                    "values": vector_values,
-                    "metadata": metadata
-                }
+                (vector_id, vector_values, metadata)  # V1 format is typically tuples
             ]
         )
         
@@ -156,20 +144,26 @@ def add_vector(vector_id, vector_values, metadata):
 def clustering_classify(index_name="github-actions-errors", n_clusters=8, sample_size=1000):
 
     try:
-        index = pc.Index(index_name)
+        index = pinecone.Index(index_name)
         
-        fetch_response = index.fetch(ids=[], limit=sample_size)
+        dimensions = 1536  
+        zero_vector = [0.0] * dimensions
+        fetch_response = index.query(
+            vector=zero_vector,
+            top_k=sample_size,
+            include_values=True
+        )
         
-        if not fetch_response.vectors:
+        if not fetch_response['matches']:
             logger.warning("No vectors found for clustering")
             return pd.DataFrame(columns=['id', 'cluster']), None
         
         vector_data = []
         vector_ids = []
         
-        for vector_id, vector_info in fetch_response.vectors.items():
-            vector_ids.append(vector_id)
-            vector_data.append(vector_info.values)
+        for match in fetch_response['matches']:
+            vector_ids.append(match['id'])
+            vector_data.append(match['values'])
         
         # Convert to numpy array for clustering
         vector_array = np.array(vector_data)
