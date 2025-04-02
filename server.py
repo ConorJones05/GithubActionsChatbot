@@ -10,7 +10,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# Add health check endpoint for Render
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "github-actions-chatbot"}
@@ -27,8 +26,8 @@ async def analyze_logs(request: Request):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     
     # Check if free user has exceeded limits
-    if not supabase_logic.free_user_check(api_key=api_key):
-        raise HTTPException(status_code=403, detail="Your free trial of BuildSage has ended: Please wait 24 hours or buy a paid plan")
+    # if not supabase_logic.free_user_check(api_key=api_key):
+    #     raise HTTPException(status_code=403, detail="Your free trial of BuildSage has ended: Please wait 24 hours or buy a paid plan")
 
     # Parse logs to extract error information
     logs_packet, issue = debug_module.parse_logs(logs)
