@@ -14,7 +14,7 @@ supabase: Client = create_client(url, key)
 
 def check_api_key(api_key):
     response = (
-        supabase.table("user_master")
+        supabase.table("users")
             .select("api_key")
             .execute())
     API_KEYS = [item['api_key'] for item in response.data]
@@ -23,7 +23,7 @@ def check_api_key(api_key):
 
 def free_user_check(api_key):
     """Check if a free user has exceeded their API call limit"""
-    response = (supabase.table("user_master")
+    response = (supabase.table("users")
      .select("api_calls")
      .eq("api_key", api_key)
      .execute()
@@ -89,7 +89,7 @@ def update_user_logs(api_key, issue):
         .execute()
     )
     
-    response = (supabase.table("user_master")
+    response = (supabase.table("users")
      .select("api_calls")
      .eq("api_key", api_key)
      .execute()
@@ -97,7 +97,7 @@ def update_user_logs(api_key, issue):
      
     if response.data and len(response.data) > 0:
         current_calls = response.data[0].get('api_calls', 0)
-        (supabase.table("user_master")
+        (supabase.table("users")
          .update({"api_calls": current_calls + 1})
          .eq("api_key", api_key)
          .execute()
@@ -111,5 +111,5 @@ def generate_api_key():
 def add_user(user, password):
     """Add a new user and return their API key"""
     api_key = generate_api_key()
-    supabase.table("user_master").insert({"user": user, "password": password, "api_key": api_key, "api_calls": 0}).execute()
+    supabase.table("users").insert({"user": user, "password": password, "api_key": api_key, "api_calls": 0}).execute()
     return api_key
