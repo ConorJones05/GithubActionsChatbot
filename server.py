@@ -10,6 +10,11 @@ load_dotenv()
 
 app = FastAPI()
 
+# Add health check endpoint for Render
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "github-actions-chatbot"}
+
 @app.post("/analyze")
 async def analyze_logs(request: Request):
     # Get data
