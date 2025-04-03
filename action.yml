@@ -133,10 +133,10 @@ runs:
         # Create the request payload
         REQUEST_DATA="{\"api_key\": \"${{ inputs.api_key }}\", \"logs\": \"$LOGS\", \"code_context\": \"$CODE_CONTEXT\", \"encoding\": \"base64\"}"
         
-        echo "Sending data to API at ${{ inputs.api_url }}/analyse..."
+        echo "Sending data to API at ${{ inputs.api_url }}/analyze..."
         RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
           -d "$REQUEST_DATA" \
-          "${{ inputs.api_url }}/analyse" 2>&1)
+          "${{ inputs.api_url }}/analyze" 2>&1)
           
         CURL_STATUS=$?
         if [ $CURL_STATUS -ne 0 ]; then

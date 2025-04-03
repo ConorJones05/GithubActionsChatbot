@@ -16,7 +16,6 @@ async def health_check():
 
 @app.post("/analyze")
 async def analyze_logs(request: Request):
-    print("Received /analyze request")
     # Get data
     try:
         data = await request.json()
