@@ -127,7 +127,7 @@ runs:
         fi
         
         # Escape special characters in logs and code context
-        LOGS=$(cat logs.build.log | base64 -w 0)
+        LOGS=$(cat logs/build.log | base64 -w 0)
         CODE_CONTEXT=$(echo "$CODE_CONTEXT" | base64 -w 0)
         
         # Create the request payload
