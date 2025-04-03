@@ -76,14 +76,12 @@ runs:
             fi
             end_line=$((line_num + 5))
             
-            # Create a unique filename for this snippet
             snippet_name=$(echo "$file_path" | sed 's/[\/\\:]/_/g')
             echo "FILE: $file_path, LINE: $line_num" > "code_context/${snippet_name}_${line_num}.txt"
             sed -n "${start_line},${end_line}p" "$file_path" >> "code_context/${snippet_name}_${line_num}.txt"
             echo "Context extracted to code_context/${snippet_name}_${line_num}.txt"
           else
             echo "File not found at $file_path, searching in repository..."
-            # Try to find the file elsewhere in the repository
             base_name=$(basename "$file_path")
             potential_file=$(find . -type f -name "$base_name" | head -1)
             
