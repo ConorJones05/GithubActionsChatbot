@@ -65,12 +65,28 @@ def call_GPT_fix(logs_packet, custom_add = None):
     if custom_add:
         content += f"\nAdditional context: {custom_add}"
     
-    completion = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[{
-        "role": "system",
-        "content": "You are an agent in charge of helping people fix their broken builds. Analyze these logs and code to identify the error and provide a clear, step-by-step solution. Focus on the actual error shown in the traceback."
-    }, {
-        "role": "user",
-        "content": content}])
-    return completion.choices[0].message
+    try:
+        # Try using new OpenAI API (v1.0.0+)
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "system",
+                "content": "You are an agent in charge of helping people fix their broken builds. Analyze these logs and code to identify the error and provide a clear, step-by-step solution. Focus on the actual error shown in the traceback."
+            }, {
+                "role": "user",
+                "content": content
+            }]
+        )
+        return completion.choices[0].message
+    except AttributeError:
+        completion = client.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "system",
+                "content": "You are an agent in charge of helping people fix their broken builds. Analyze these logs and code to identify the error and provide a clear, step-by-step solution. Focus on the actual error shown in the traceback."
+            }, {
+                "role": "user",
+                "content": content
+            }]
+        )
+        return completion.choices[0].message["content"]
