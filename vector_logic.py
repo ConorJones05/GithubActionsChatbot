@@ -57,7 +57,7 @@ def token_checker(text, model_name):
 
 def vector_embeddings(text):
     try:
-        response = client.embeddings.create(
+        response = client.Embedding.create(
             model="text-embedding-3-small",
             input=text
         )
