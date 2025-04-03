@@ -5,6 +5,8 @@ import supabase_logic
 import uuid
 from dotenv import load_dotenv
 import re
+import base64
+
 
 load_dotenv()
 
@@ -16,12 +18,12 @@ async def health_check():
 
 @app.post("/analyze")
 async def analyze_logs(request: Request):
-    # Get data
     try:
         data = await request.json()
         api_key = data.get("api_key")
         logs = data.get("logs")
-        code_context = data.get("code_context", "")  # Get code context if provided
+        code_context = data.get("code_context", "")
+        code_context = base64.b64decode(logs).decode("utf-8")
         if not api_key or not logs:
             print("ERROR: Missing required parameters (api_key or logs)")
             raise HTTPException(status_code=400, detail="Missing required parameters")
