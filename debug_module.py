@@ -65,7 +65,7 @@ def call_GPT_fix(logs_packet, custom_add = None):
     if custom_add:
         content += f"\nAdditional context: {custom_add}"
     
-    completion = client.ChatCompletion.create( #### WILL NOT FUCKING WORK
+    completion = client.ChatCompletion.create(
     model="gpt-4o",
     messages=[{
         "role": "system",

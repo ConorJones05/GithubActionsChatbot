@@ -62,7 +62,6 @@ async def analyze_logs(request: Request):
         except Exception as e:
             print(f"Error extracting code context: {str(e)}")
         
-    # Don't try to access user code locally - it won't be available
     # additional_context += debug_module.access_user_code(file_name, line_number)
     
     # Create vector embedding of the error logs

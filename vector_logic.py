@@ -131,7 +131,7 @@ def add_vector(vector_id, vector_values, metadata):
         # Upsert the vector
         upsert_response = index.upsert(
             vectors=[
-                (vector_id, vector_values, metadata)  # V1 format is typically tuples
+                (vector_id, vector_values, metadata)
             ]
         )
         
