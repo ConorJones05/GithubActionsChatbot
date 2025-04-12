@@ -6,6 +6,8 @@ import string
 import secrets
 from dotenv import load_dotenv
 import logging
+from pydantic import BaseModel, Field, BaseSettings
+from typing import Optional, Any
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,29 +15,44 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+class User(BaseModel):
+    user: str
+    password: str
+    api_key: str
+    api_calls: int = 0
+    last_log_time: Optional[datetime] = None
+    last_issue: Optional[str] = None
 
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+class LogEntry(BaseModel):
+    api_key: str
+    issue: str
+    timestamp: datetime = Field(default_factory=datetime.now)
 
-if url and key:
-    logger.info(f"Connecting to Supabase...")
+class SupabaseConfig(BaseSettings):
+    url: str
+    key: str
+    
+    class Config:
+        env_prefix = "SUPABASE_"
+
+def initialize_supabase() -> Client:
+    """Initialize and return a Supabase client."""
+    load_dotenv()
+    
     try:
-        supabase: Client = create_client(url, key)
+        config = SupabaseConfig()
+        logger.info("Connecting to Supabase...")
+        client = create_client(config.url, config.key)
         logger.info("Supabase client initialized successfully")
+        return client
     except Exception as e:
         logger.error(f"ERROR initializing Supabase client: {str(e)}")
-        raise e
-else:
-    logger.error("Missing Supabase credentials")
-    raise RuntimeError("Missing required Supabase credentials")
+        raise RuntimeError("Failed to initialize Supabase client") from e
 
-def check_api_key(api_key):
-    """
-    Verify if the API key is valid
-    """
+def check_api_key(client: Client, api_key: str) -> bool:
+    """Verify if the API key is valid"""
     try:
-        response = (supabase.table("users")
+        response = (client.table("users")
             .select("api_key")
             .eq("api_key", api_key)
             .execute())
@@ -44,33 +61,29 @@ def check_api_key(api_key):
         logger.error(f"ERROR checking API key: {str(e)}")
         return False
 
-def free_user_check(api_key):
+def free_user_check(client: Client, api_key: str) -> bool:
     """Check if a free user has exceeded their API call limit"""
-    logger.info(f"Checking free user limits...")
+    logger.info("Checking free user limits...")
     try:
-        response = (supabase.table("users")
-         .select("api_calls")
-         .eq("api_key", api_key)
-         .execute()
-         )
+        response = (client.table("users")
+            .select("api_calls")
+            .eq("api_key", api_key)
+            .execute())
         if not response.data:
             logger.warning("No user data found for API key")
             return True 
         api_calls = response.data[0]['api_calls']
         logger.info(f"User has made {api_calls} API calls")
-        result = api_calls >= 4
-        return result
+        return api_calls >= 4
     except Exception as e:
         logger.error(f"ERROR checking free user limits: {str(e)}")
         return True
 
-def error_perfect(api_key, issue):
-    """
-    Check if this exact error has been seen before
-    """
+def error_perfect(client: Client, api_key: str, issue: Any) -> bool:
+    """Check if this exact error has been seen before"""
     try:
         if issue:
-            response = (supabase.table("logs")
+            response = (client.table("logs")
                 .select("issue")
                 .eq("api_key", api_key)
                 .eq("issue", str(issue))
@@ -79,16 +92,12 @@ def error_perfect(api_key, issue):
             return len(response.data) > 0
     except Exception as e:
         logger.error(f"ERROR checking for duplicate errors: {str(e)}")
-    
     return False
 
-def check_last_log(api_key) -> bool:
-    """
-    Check if the user has submitted logs recently
-    """
+def check_last_log(client: Client, api_key: str) -> bool:
+    """Check if the user has submitted logs recently"""
     try:
-        # Look for logs in the past hour
-        response = (supabase.table("logs")
+        response = (client.table("logs")
             .select("timestamp")
             .eq("api_key", api_key)
             .gte("timestamp", (datetime.now() - timedelta(hours=1)).isoformat())
@@ -96,46 +105,75 @@ def check_last_log(api_key) -> bool:
         return len(response.data) > 0
     except Exception as e:
         logger.error(f"ERROR checking for recent logs: {str(e)}")
-    
-    # Default to treating all errors as new
     return False
 
-def update_user_logs(api_key, issue):
-    """
-    Update user logs in the database
-    """
-    logger.info(f"Updating logs for user...")
-    
+def update_user_logs(client: Client, api_key: str, issue: Any, repo: str) -> bool:
+    """Update user logs in the database"""
+    logger.info("Updating logs for user...")
     try:
-        # Increment the user's API call count
-        response = (supabase.table("users")
-            .update({"api_calls": supabase.raw("api_calls + 1"), 
-                     "last_log_time": datetime.now().isoformat(),
-                     "last_issue": str(issue)})
-            .eq("api_key", api_key)
-            .execute())
+        client.table("users").update({
+            "api_calls": client.raw("api_calls + 1"), 
+            "last_log_time": datetime.now().isoformat(),
+            "last_issue": str(issue),
+            "repo_used": repo
+        }).eq("api_key", api_key).execute()
         
-        log_entry = {
-            "api_key": api_key,
-            "issue": str(issue),
-            "timestamp": datetime.now().isoformat()
-        }
-        supabase.table("logs").insert(log_entry).execute()
+        log_entry = LogEntry(api_key=api_key, issue=str(issue))
+        client.table("logs").insert(log_entry.dict()).execute()
         
         logger.info("Database updated successfully")
         return True
     except Exception as e:
         logger.error(f"ERROR updating user logs in Supabase: {str(e)}")
-        # Return False to indicate failure
         return False
 
-def generate_api_key():
+def generate_api_key() -> str:
+    """Generate a random API key"""
     alphabet = string.ascii_letters + string.digits
-    length = 32
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
+    return ''.join(secrets.choice(alphabet) for _ in range(32))
 
-def add_user(user, password):
+def add_user(client: Client, username: str, password: str) -> str:
     """Add a new user and return their API key"""
     api_key = generate_api_key()
-    supabase.table("users").insert({"user": user, "password": password, "api_key": api_key, "api_calls": 0}).execute()
+    new_user = User(user=username, password=password, api_key=api_key)
+    client.table("users").insert(new_user.dict()).execute()
     return api_key
+
+def grab_user_API_key(client: Client, username: str, password: str) -> str:
+    """Gets the user API key"""
+    try:
+        response = (client.table("users")
+            .select("api_key")
+            .eq("username", username)
+            .execute())
+        return response.data
+    except Exception as e:
+        logger.error(f"ERROR checking fetching key: {str(e)}")
+        return None
+    
+def check_user_login(client: Client, username: str, password: str) -> bool:
+    """Checks if the user is in the Database"""
+    try:
+        response = (client.table("users")
+            .select("api_key")
+            .eq("username", username)
+            .eq("password", password)
+            .execute())
+        return response.data > 0 
+    except Exception as e:
+        logger.error(f"ERROR checking authenticating user: {str(e)}")
+        return False
+    
+def repo_user_has_used(client: Client, api_key: str) -> set[str]:
+    try:
+        response = (client.table("users")
+            .select("repos")
+            .eq("api_key", api_key)
+            .execute())
+        return set(response.data)
+    except Exception as e:
+        logger.error(f"ERROR checking repos: {str(e)}")
+        return False
+
+
+supabase_client = initialize_supabase()
