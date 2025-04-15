@@ -62,41 +62,32 @@ async def analyze_logs(request: AnalyzeRequest) -> Dict[str, Any]:
     processed_logs = vector_logic.token_checker(logs_packet.logs, "cl100k_base")
     error_vector = vector_logic.vector_embeddings(processed_logs)
 
-    # Get analysis and generate new code recommendation
     analysis = debug_module.call_gpt_fix(logs_packet)
     new_code = debug_module.call_gpt_new_code(logs_packet)
 
-    # Extract old code from logs if possible
     old_code = ""
     file_name = logs_packet.file_name if logs_packet.file_name else "unknown"
     
-    # Check if code_context is provided and extract from it first
     if code_context:
         try:
             decoded_context = base64.b64decode(code_context).decode("utf-8")
             
-            # Extract file content from the structured format
             context_pattern = r'===BEGIN_FILE: ([^=]+)===\n(.*?)===END_FILE==='
             context_matches = re.findall(context_pattern, decoded_context, re.DOTALL)
             
             if context_matches:
-                # Use the first file's content as old_code
                 context_file_name, context_content = context_matches[0]
                 
-                # Extract actual file name from the context file name
-                # The format is typically something like _path_to_filename_line.txt
                 if "_" in context_file_name:
                     extracted_name = context_file_name.split("_")[-2]
                     if extracted_name:
                         file_name = extracted_name
                 
-                # Look for FILE: path/to/file.py line references
                 file_line_match = re.search(r'FILE: ([^,]+), LINE:', context_content)
                 if file_line_match:
                     actual_file_path = file_line_match.group(1)
                     file_name = os.path.basename(actual_file_path)
                 
-                # Remove the FILE: header line if present
                 code_lines = context_content.split('\n')
                 if code_lines and "FILE:" in code_lines[0] and "LINE:" in code_lines[0]:
                     code_lines = code_lines[1:]
@@ -106,37 +97,30 @@ async def analyze_logs(request: AnalyzeRequest) -> Dict[str, Any]:
         except Exception as e:
             print(f"Error extracting from code context: {str(e)}")
     
-    # Fall back to looking for code blocks in logs if we couldn't extract from context
     if not old_code:
-        # Look for code blocks in logs
         code_blocks = re.findall(r'```[\w]*\n(.*?)```', logs, re.DOTALL)
         if code_blocks:
             old_code = code_blocks[0]
             print("Extracted old code from markdown code blocks")
         
-        # If still no code found, look for the structured format in logs too
         if not old_code:
             context_pattern = r'===BEGIN_FILE: ([^=]+)===\n(.*?)===END_FILE==='
             context_matches = re.findall(context_pattern, logs, re.DOTALL)
             
             if context_matches:
-                # Use the first file's content as old_code
                 context_file_name, old_code = context_matches[0]
                 print(f"Extracted old code from log structured format: {context_file_name}")
     
-    # Get user_id from api_key
     client = supabase_logic.initialize_supabase()
     user_response = client.table("users").select("user_id").eq("api_key", api_key).execute()
     
     if user_response.data and len(user_response.data) > 0:
         user_id = user_response.data[0]["user_id"]
         
-        # Extract repository name from logs
         repo_pattern = r'github\.com/([^/]+/[^/]+)'
         repo_match = re.search(repo_pattern, logs)
         repo = repo_match.group(1) if repo_match else "unknown/repo"
         
-        # Save recommendation
         supabase_logic.update_recommendations(
             client, 
             user_id, 
@@ -147,7 +131,6 @@ async def analyze_logs(request: AnalyzeRequest) -> Dict[str, Any]:
             analysis
         )
         
-        # Update user logs and repository
         supabase_logic.update_user_logs(client, api_key, logs_packet.file_name, repo)
     
     metadata = vector_logic.VectorMetadata(
