@@ -105,7 +105,7 @@ def check_last_log(client: Client, api_key: str) -> bool:
         return len(response.data) > 0
     except Exception as e:
         logger.error(f"ERROR checking for recent logs: {str(e)}")
-    return False
+        return False
 
 def update_user_logs(client: Client, api_key: str, issue: Any, repo: str) -> bool:
     """Update user logs in the database"""
@@ -132,24 +132,6 @@ def generate_api_key() -> str:
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(32))
 
-def add_user(client: Client, username: str, password: str) -> str:
-    """Add a new user and return their API key"""
-    api_key = generate_api_key()
-    new_user = User(user=username, password=password, api_key=api_key)
-    client.table("users").insert(new_user.dict()).execute()
-    return api_key
-
-def grab_user_API_key(client: Client, username: str, password: str) -> str:
-    """Gets the user API key"""
-    try:
-        response = (client.table("users")
-            .select("api_key")
-            .eq("username", username)
-            .execute())
-        return response.data
-    except Exception as e:
-        logger.error(f"ERROR checking fetching key: {str(e)}")
-        return None
     
 def check_user_login(client: Client, username: str, password: str) -> bool:
     """Checks if the user is in the Database"""
@@ -173,6 +155,29 @@ def repo_user_has_used(client: Client, api_key: str) -> set[str]:
         return set(response.data)
     except Exception as e:
         logger.error(f"ERROR checking repos: {str(e)}")
+        return False
+    
+def update_recommendations(client: Client, user_id: str, repository: str, file_name: str, 
+                         old_code: str, new_code: str, response_data: str) -> bool:
+    """Create or update recommendation in the database"""
+    try:
+        logger.info(f"Saving recommendation for repo: {repository}")
+        
+        # Insert new recommendation
+        client.table("recommendations").insert({
+            "repository": repository,
+            "file_name": file_name,
+            "old_code": old_code,
+            "new_code": new_code,
+            "response_data": response_data,
+            "created_at": datetime.now().isoformat(),
+            "user_id": user_id
+        }).execute()
+        
+        logger.info("Recommendation saved successfully")
+        return True
+    except Exception as e:
+        logger.error(f"ERROR updating recommendations in Supabase: {str(e)}")
         return False
 
 

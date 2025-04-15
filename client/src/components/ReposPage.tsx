@@ -1,66 +1,180 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-const GITHUB_API_BASE_URL = "https://api.github.com";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../utils/supabaseClient";
 
-const getGitHubToken = () => {
-    return localStorage.getItem("github_token");
-};
+interface RepoRecommendation {
+  responseData: string;
+  oldCode: string;
+  newCode: string;
+  fileName: string;
+}
 
-const fetchGitHubRepositories = async () => {
-    const token = getGitHubToken();
-    if (!token) {
-        throw new Error("GitHub token not found");
-    }
-    
-    try {
-        const response = await axios.get(`${GITHUB_API_BASE_URL}/user/repos`, {
-            headers: {
-                Authorization: `token ${token}`,
-                Accept: "application/vnd.github.v3+json"
-            },
-            params: {
-                sort: "updated",
-                per_page: 100
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching GitHub repositories:", error);
-        throw error;
-    }
-};
 function ReposPage() {
-  const [repos, setRepos] = useState([]);
+  const [repos, setRepos] = useState<string[]>([]);
+  const [recommendations, setRecommendations] = useState<Record<string, RepoRecommendation>>({});
+  const [loadingRepos, setLoadingRepos] = useState(true);
+  const [loadingRecommendation, setLoadingRecommendation] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchRepos = async () => {
-      const response = await fetch("/api/repos");
-      if (response.ok) {
-        const data = await response.json();
-        setRepos(data.repos);
-      } else {
-        navigate("/");
+      try {
+        console.log("Fetching repos for user:", user?.id);
+        setLoadingRepos(true);
+        
+        if (!user) {
+          setError("User not authenticated");
+          return;
+        }
+        
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("repo_used")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (userError) {
+          console.error("Error fetching repos from Supabase:", userError);
+          setError("Failed to load repositories from database");
+          return;
+        }
+        
+        console.log("Supabase response:", userData);
+        
+        if (userData && userData.repo_used && Array.isArray(userData.repo_used)) {
+          setRepos(userData.repo_used);
+        } else {
+          setRepos([]);
+        }
+        
+        setError(null);
+      } catch (error) {
+        console.error("Error fetching repositories:", error);
+        setError("Error fetching repository data");
+      } finally {
+        setLoadingRepos(false);
       }
     };
 
-    fetchRepos();
-  }, [navigate]);
+    if (user) {
+      fetchRepos();
+    }
+  }, [user]);
+
+  const fetchRecommendation = async (repo: string) => {
+    try {
+      setLoadingRecommendation((prev) => ({ ...prev, [repo]: true }));
+      
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      const { data, error: recError } = await supabase
+        .from("recommendations")
+        .select("response_data, old_code, new_code, file_name")
+        .eq("repository", repo)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      
+      console.log(`Response for ${repo}:`, data);
+      
+      if (recError) {
+        console.error(`Error fetching recommendation for ${repo}:`, recError);
+        setRecommendations((prev) => ({
+          ...prev,
+        }));
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setRecommendations((prev) => ({
+          ...prev,
+          [repo]: {
+            responseData: data[0].response_data,
+            oldCode: data[0].old_code,
+            newCode: data[0].new_code,
+            fileName: data[0].file_name,
+          },
+        }));
+      } else {
+        setRecommendations((prev) => ({
+          ...prev,
+        }));
+      }
+    } catch (error) {
+      console.error(`Error fetching recommendation for repo: ${repo}`, error);
+      setRecommendations((prev) => ({
+        ...prev,
+      }));
+    } finally {
+      setLoadingRecommendation((prev) => ({ ...prev, [repo]: false }));
+    }
+  };
 
   return (
     <div>
       <h1>Your Repositories</h1>
-      {repos.length > 0 ? (
+      
+      {error && (
+        <div>
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {loadingRepos ? (
+        <div>
+          <div></div>
+        </div>
+      ) : repos.length > 0 ? (
         <ul>
-          {repos.map((repo, index) => (
-            <li key={index}>{repo}</li>
+          {repos.map((repo) => (
+            <li key={repo}>
+              <div>
+                <span>{repo}</span>
+                <button
+                  onClick={() => fetchRecommendation(repo)}
+                  disabled={loadingRecommendation[repo]}
+                >
+                  {loadingRecommendation[repo] ? "Loading..." : "Show Recommendation"}
+                </button>
+              </div>
+              {recommendations[repo] && (
+                <div>
+                  <h3>Recommendation:</h3>
+                  <p>{recommendations[repo].fileName}</p>
+                  <p>{recommendations[repo].responseData}</p>
+                  <div>
+                    <div>
+                      <h4>Old Code:</h4>
+                      <pre>
+                        {recommendations[repo].oldCode}
+                      </pre>
+                    </div>
+                    <div>
+                      <h4>New Code:</h4>
+                      <pre>
+                        {recommendations[repo].newCode}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </li>
           ))}
         </ul>
       ) : (
-        <p>Loading...</p>
+        <p>No repositories found. Try using the GitHub Actions Chatbot with your workflows first.</p>
       )}
-      <button onClick={() => navigate("/api-key")}>Back to API Key</button>
+      <button
+        onClick={() => navigate("/api-key")}
+      >
+        Back to API Key
+      </button>
     </div>
   );
 }

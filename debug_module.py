@@ -63,3 +63,24 @@ def call_gpt_fix(log_packet: LogPacket, custom_add: Optional[str] = None) -> str
         return completion.choices[0].message.content
     except Exception as e:
         raise RuntimeError(f"Failed to analyze logs with GPT: {str(e)}")
+    
+def call_gpt_new_code(log_packet: LogPacket, custom_add: Optional[str] = None) -> str:
+    """Call GPT give recommendations about the code to switch out."""
+    content = log_packet.logs
+    if custom_add:
+        content += f"\nAdditional context: {custom_add}"
+
+    try:
+        completion = client.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an agent in charge of helping people fix their broken builds. Analyze these logs and code to identify the error and provide a solution for the probelm using the code provided. THe user should be able to drag and drop the new code inot there code and it work instantly.",
+                },
+                {"role": "user", "content": content},
+            ],
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        raise RuntimeError(f"Failed to analyze for new code with GPT: {str(e)}")
