@@ -1,0 +1,148 @@
+name: SaaS Debuging
+description: Sends the failed build to AI
+inputs:
+  api_key:
+    description: Please input your API key
+    required: true
+  api_url:
+    description: Please input your debuging API key
+    required: true
+    default: https://githubactionschatbot.onrender.com
+
+runs:
+  using: composite
+  steps:
+    - name: Check and prepare build script
+      shell: bash
+      run: |
+        if [ ! -f "./build_script.sh" ]; then
+          echo "Creating build_script.sh as it does not exist"
+          echo "#!/bin/bash" > build_script.sh
+          echo "echo 'This is a placeholder build script'" >> build_script.sh
+        fi
+        chmod +x ./build_script.sh
+
+    - name: Capture the Logs
+      shell: bash
+      run: |
+        echo "Your build failed, capturing logs..."
+        mkdir -p logs
+        ./build_script.sh > logs/build.log 2>&1 || true
+
+    # - name: Checkout the Client repo
+    #   using: actions/checkout@v2
+    #   with:
+    #     repository: ${{ inputs.github-url }}
+    #     token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Code Context
+      shell: bash
+      run: |
+        mkdir -p code_context
+        echo "Starting code context extraction..."
+
+        # Extract file paths and line numbers from logs
+        grep -E 'File "([^"]+)", line [0-9]+|([^:]+):[0-9]+:[0-9]+:|Error in [^:]+:[0-9]+' logs/build.log || echo "No pattern found in logs"
+
+        grep -E 'File "([^"]+)", line [0-9]+|([^:]+):[0-9]+:[0-9]+:|Error in [^:]+:[0-9]+' logs/build.log | while read -r match; do
+          echo "Processing match: $match"
+
+          # Try different patterns to extract file path and line number
+          if [[ "$match" =~ File\ \"([^\"]+)\",\ line\ ([0-9]+) ]]; then
+            file_path="${BASH_REMATCH[1]}"
+            line_num="${BASH_REMATCH[2]}"
+          elif [[ "$match" =~ ([^:\ ]+):([0-9]+):[0-9]+: ]]; then
+            file_path="${BASH_REMATCH[1]}"
+            line_num="${BASH_REMATCH[2]}"
+          elif [[ "$match" =~ Error\ in\ ([^:]+):([0-9]+) ]]; then
+            file_path="${BASH_REMATCH[1]}"
+            line_num="${BASH_REMATCH[2]}"
+          else
+            # Fall back to original pattern
+            file_path=$(echo "$match" | grep -o 'File "[^"]*"' | sed 's/File "//;s/"$//')
+            line_num=$(echo "$match" | grep -o 'line [0-9]*' | sed 's/line //')
+          fi
+
+          echo "Found reference to file: $file_path at line: $line_num"
+
+          # Check if the file exists
+          if [ -f "$file_path" ]; then
+            echo "File exists at exact path, extracting context..."
+            # Extract context (5 lines before and after the error line)
+            start_line=$((line_num - 5))
+            if [ $start_line -lt 1 ]; then
+              start_line=1
+            fi
+            end_line=$((line_num + 5))
+
+            snippet_name=$(echo "$file_path" | sed 's/[\/\\:]/_/g')
+            echo "FILE: $file_path, LINE: $line_num" > "code_context/${snippet_name}_${line_num}.txt"
+            sed -n "${start_line},${end_line}p" "$file_path" >> "code_context/${snippet_name}_${line_num}.txt"
+            echo "Context extracted to code_context/${snippet_name}_${line_num}.txt"
+          else
+            echo "File not found at $file_path, searching in repository..."
+            base_name=$(basename "$file_path")
+            potential_file=$(find . -type f -name "$base_name" | head -1)
+
+            if [ -n "$potential_file" ] && [ -f "$potential_file" ]; then
+              echo "Found potential match: $potential_file"
+              start_line=$((line_num - 5))
+              if [ $start_line -lt 1 ]; then
+                start_line=1
+              fi
+              end_line=$((line_num + 5))
+
+              snippet_name=$(echo "$potential_file" | sed 's/[\/\\:]/_/g')
+              echo "FILE: $potential_file, LINE: $line_num" > "code_context/${snippet_name}_${line_num}.txt"
+              sed -n "${start_line},${end_line}p" "$potential_file" >> "code_context/${snippet_name}_${line_num}.txt"
+              echo "Context extracted from potential match"
+            else
+              echo "Warning: Could not find file '$file_path' or any matching files"
+            fi
+          fi
+        done || echo "No matching files found in logs"
+
+        # List extracted context files
+        echo "Extracted code context files:"
+        ls -la code_context/ || echo "No context files were created"
+
+    - name: Send to API
+      shell: bash
+      run: |
+        # Ensure logs directory and file exist
+        mkdir -p logs
+        touch logs/build.log
+
+        # Prepare code context data
+        CODE_CONTEXT=""
+        if [ -d "code_context" ] && [ "$(ls -A code_context 2>/dev/null)" ]; then
+          echo "Preparing code context from $(ls code_context | wc -l) files..."
+          for snippet in code_context/*; do
+            # Add file content with clear separation
+            CODE_CONTEXT="${CODE_CONTEXT}===BEGIN_FILE: $(basename "$snippet")===\n$(cat "$snippet")\n===END_FILE===\n\n"
+          done
+        else
+          echo "No code context files found"
+        fi
+
+        # Escape special characters in logs and code context
+        LOGS=$(cat logs/build.log | base64 -w 0)
+        CODE_CONTEXT=$(echo "$CODE_CONTEXT" | base64 -w 0)
+
+        # Create the request payload
+        REQUEST_DATA="{\"api_key\": \"${{ inputs.api_key }}\", \"logs\": \"$LOGS\", \"code_context\": \"$CODE_CONTEXT\", \"encoding\": \"base64\"}"
+
+        echo "Sending data to API at ${{ inputs.api_url }}/analyze..."
+        RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
+          -d "$REQUEST_DATA" \
+          "${{ inputs.api_url }}/analyze" 2>&1)
+
+        CURL_STATUS=$?
+        if [ $CURL_STATUS -ne 0 ]; then
+          echo "Error sending data to API: $CURL_STATUS"
+          echo "cURL error: $RESPONSE"
+        fi
+
+        echo "::group::Here is a method to fix your build"
+        echo "$RESPONSE"
+        echo "::endgroup::"
