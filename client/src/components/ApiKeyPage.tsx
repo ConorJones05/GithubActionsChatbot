@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../utils/supabaseClient";
-import './LoginPage.css'
+import { apiKeyService } from "../services/apiKeyService";
+import ApiKeyDisplay from "./api-key/ApiKeyDisplay";
+import GitHubActionsCode from "./api-key/GitHubActionsCode";
+import NavigationButtons from "./api-key/NavigationButtons";
+import LoadingSpinner from "./api-key/LoadingSpinner";
+import './ApiKeyPage.css'; 
 
 function ApiKeyPage() {
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [snippetCopied, setSnippetCopied] = useState(false);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
   const { user, signOut } = useAuth();
 
   useEffect(() => {
@@ -16,33 +20,14 @@ function ApiKeyPage() {
       
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from("users")
-          .select("api_key")
-          .eq("user_id", user.id)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          throw error;
-        }
         
-        if (data?.api_key) {
-          setApiKey(data.api_key);
+        const existingKey = await apiKeyService.fetchApiKey(user.id);
+        
+        if (existingKey) {
+          setApiKey(existingKey);
         } else {
-          const response = await fetch("/api/generate-key", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error("Failed to generate API key");
-          }
-          
-          const newKeyData = await response.json();
-          setApiKey(newKeyData.api_key);
+          const newKey = await apiKeyService.generateApiKey();
+          setApiKey(newKey);
         }
       } catch (error) {
         console.error("Error fetching API key:", error);
@@ -55,77 +40,56 @@ function ApiKeyPage() {
     fetchApiKey();
   }, [user]);
 
-  const getGitHubActionCode = () => {
-    return `name: Debug with SaaS Debugging
-if: \${{ failure() || steps.build.outcome == 'failure' }}
-uses: ConorJones05/githubactionschatbot@main
-with:
-  api_key: ${apiKey}`;
-  };
-
   const handleCopySnippet = () => {
-    navigator.clipboard.writeText(getGitHubActionCode());
-    alert("GitHub Action code copied to clipboard!");
+    navigator.clipboard.writeText(`- name: Debug with SaaS Debugging
+\t\t\t\tif: \${{ failure() || steps.build.outcome == 'failure' }}
+\t\t\t\tuses: ConorJones05/githubactionschatbot@main
+\t\t\t\twith:
+\t\t\t\t  api_key: ${apiKey}`);
+    
+    setSnippetCopied(true);
+    
+    setTimeout(() => {
+      setSnippetCopied(false);
+    }, 2000);
   };
 
   const handleCopyApiKey = () => {
     navigator.clipboard.writeText(apiKey);
-    alert("API key copied to clipboard!");
+    
+    setApiKeyCopied(true);
+    
+    setTimeout(() => {
+      setApiKeyCopied(false);
+    }, 2000);
   };
 
   return (
-    <div>
-      <div>
-        <h1>GitHub Actions Integration</h1>
+    <div className="api-container">
+      <div className="api-content">
+        <div className="api-header">
+          <h1 className="api-title">GitHub Actions Integration</h1>
+        </div>
         
         {loading ? (
-          <div>
-            <div></div>
-          </div>
+          <LoadingSpinner />
         ) : (
-          <div>
-            <div>
-              <h2>1. Copy this code into your workflow file:</h2>
-              <div>
-                <pre>
-                  {getGitHubActionCode()}
-                </pre>
-                <button 
-                  onClick={handleCopySnippet}
-                >
-                  Copy
-                </button>
-              </div>
-              <p>Add this step to your GitHub workflow file (.github/workflows/your-workflow.yml)</p>
-            </div>
+          <>
+            <GitHubActionsCode 
+              apiKey={apiKey} 
+              onCopy={handleCopySnippet}
+              copied={snippetCopied}
+            />
             
-            <div>
-              <h2>2. Your API Key:</h2>
-              <div>
-                <code>{apiKey}</code>
-                <button 
-                  onClick={handleCopyApiKey}
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-          </div>
+            <ApiKeyDisplay 
+              apiKey={apiKey} 
+              onCopy={handleCopyApiKey}
+              copied={apiKeyCopied}
+            />
+          </>
         )}
         
-        <div>
-          <button 
-            onClick={() => navigate("/repos")}
-          >
-            View My Repositories
-          </button>
-          
-          <button 
-            onClick={signOut}
-          >
-            Sign Out
-          </button>
-        </div>
+        <NavigationButtons onSignOut={signOut} />
       </div>
     </div>
   );
