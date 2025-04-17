@@ -22,7 +22,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up initial session
     const getInitialSession = async () => {
       const { data } = await supabase.auth.getSession();
       setSession(data.session);
@@ -32,16 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getInitialSession();
 
-    // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
-    // Clean up subscription
     return () => {
       authListener.subscription.unsubscribe();
     };
