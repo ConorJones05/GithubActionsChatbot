@@ -1,11 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use environment variables from the .env file
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Check your .env file.');
-}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+console.log('Initializing Supabase client...');
+
+export const supabase = createClient(
+  supabaseUrl || '', 
+  supabaseAnonKey || '',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true 
+    }
+  }
+);
+
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event, session ? 'User authenticated' : 'No session');
+});

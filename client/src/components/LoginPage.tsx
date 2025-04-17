@@ -12,6 +12,19 @@ function LoginPage() {
   const { user } = useAuth();
 
   useEffect(() => {
+    const handleAuthRedirect = async () => {
+      if (window.location.hash && window.location.hash.includes('access_token=')) {
+        console.log('Detected access token in URL');
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          console.log('Session established, redirecting to API key page');
+          navigate('/api-key');
+        }
+      }
+    };
+
+    handleAuthRedirect();
+
     if (user) {
       console.log('User already logged in, redirecting to /api-key');
       navigate('/api-key');
@@ -23,7 +36,10 @@ function LoginPage() {
       setLoading(true);
       setError(null);
 
-      const redirectUrl = `${window.location.origin}`;
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? 'https://buildsage-sooty.vercel.app'
+        : `${window.location.origin}`;
+      
       console.log('Using redirect URL:', redirectUrl);
 
       const { error } = await supabase.auth.signInWithOAuth({
