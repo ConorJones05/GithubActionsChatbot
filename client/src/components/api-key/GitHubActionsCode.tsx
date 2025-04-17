@@ -9,10 +9,10 @@ interface GitHubActionsCodeProps {
 const GitHubActionsCode: React.FC<GitHubActionsCodeProps> = ({ apiKey, onCopy, copied }) => {
   const getGitHubActionCode = () => {
     return `- name: Debug with SaaS Debugging
-\t\t\t\tif: \${{ failure() || steps.build.outcome == 'failure' }}
-\t\t\t\tuses: ConorJones05/githubactionschatbot@main
-\t\t\t\twith:
-\t\t\t\t\tapi_key: ${apiKey}`;
+\t\tif: \${{ failure() || steps.build.outcome == 'failure' }}
+\t\tuses: ConorJones05/githubactionschatbot@main
+\t\twith:
+\t\t\tapi_key: ${apiKey}`;
   };
 
   return (

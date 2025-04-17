@@ -7,6 +7,8 @@ interface LoginContainerProps {
 }
 
 const LoginContainer: React.FC<LoginContainerProps> = ({ onLogin, loading }) => {
+  console.log('LoginContainer rendering, loading state:', loading);
+  
   return (
     <div className="login-container">
       <LoginCard onLogin={onLogin} loading={loading} />

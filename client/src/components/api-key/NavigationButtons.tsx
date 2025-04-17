@@ -2,11 +2,20 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface NavigationButtonsProps {
-  onSignOut: () => void;
+  onSignOut: () => Promise<void>;
 }
 
 const NavigationButtons: React.FC<NavigationButtonsProps> = ({ onSignOut }) => {
   const navigate = useNavigate();
+  
+  const handleSignOut = async () => {
+    try {
+      await onSignOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
   
   return (
     <div className="nav-buttons">
@@ -19,7 +28,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({ onSignOut }) => {
       
       <button 
         className="nav-button secondary-button"
-        onClick={onSignOut}
+        onClick={handleSignOut}
       >
         Sign Out
       </button>

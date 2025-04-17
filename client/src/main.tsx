@@ -1,53 +1,30 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "./index.css";
-import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/login";
-import ApiPage from "./pages/api-key";
-import Repos from "./pages/repos";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return <div>
-      <div></div> 
-    </div>;
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-}
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import LoginPage from './components/LoginPage'; 
+import ApiKeyPage from './components/ApiKeyPage';
+import ReposPage from './components/ReposPage';
+import './index.css';
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/api-key" element={
-        <ProtectedRoute>
-          <ApiPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/repos" element={
-        <ProtectedRoute>
-          <Repos />
-        </ProtectedRoute>
-      } />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/api-key" element={<ApiKeyPage />} />
+      <Route path="/repos" element={<ReposPage />} />
     </Routes>
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <AppRoutes />
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   </React.StrictMode>
 );
+

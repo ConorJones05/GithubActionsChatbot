@@ -22,6 +22,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const getInitialSession = async () => {
       const { data } = await supabase.auth.getSession();
       setSession(data.session);
@@ -45,7 +47,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error during sign out:', error.message);
+        throw error;
+      }
+      
+      setUser(null);
+      setSession(null);
+      
+      console.log('Successfully signed out');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
