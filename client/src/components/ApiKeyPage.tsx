@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiKeyService } from "../services/apiKeyService";
-import ApiKeyDisplay from "./api-key/ApiKeyDisplay";
-import GitHubActionsCode from "./api-key/GitHubActionsCode";
-import NavigationButtons from "./api-key/NavigationButtons";
-import LoadingSpinner from "./api-key/LoadingSpinner";
+import ApiKeyDisplay from "./ApiKeyDisplay";
+import GitHubActionsCode from "./GitHubActionsCode";
+import NavigationButtons from "./NavigationButtons";
+import LoadingSpinner from "./LoadingSpinner";
 import './ApiKeyPage.css'; 
 
 function ApiKeyPage() {
