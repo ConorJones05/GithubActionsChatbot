@@ -185,3 +185,57 @@ def call_gpt_new_code(
         raise RuntimeError(result.error)
     
     return result.content
+
+
+def call_gpt_fix_with_combined_logs(
+    log_packet: LogPacket, 
+    combined_logs: str,
+    config: Optional[GptCompletionConfig] = None
+) -> str:
+    """Call GPT for fix with additional context from combined logs."""
+    try:
+        prompt = f"""Original error:
+{log_packet.logs}
+
+Full context with additional repository information:
+{combined_logs}
+"""
+        
+        result = call_gpt(
+            log_packet=log_packet,
+            analysis_type=AnalysisType.FIX,
+            config=config,
+            custom_add=combined_logs
+        )
+        
+        if result.error:
+            raise RuntimeError(result.error)
+        
+        return result.content
+    except Exception as e:
+        logger.error(f"Error in call_gpt_fix_with_combined_logs: {str(e)}")
+        # Return a fallback message if there's an error
+        return "I encountered an error analyzing your logs. Please try again or contact support."
+
+
+def call_gpt_new_code_with_combined_logs(
+    log_packet: LogPacket, 
+    combined_logs: str,
+    config: Optional[GptCompletionConfig] = None
+) -> str:
+    """Call GPT for new code with additional context from combined logs."""
+    try:
+        result = call_gpt(
+            log_packet=log_packet,
+            analysis_type=AnalysisType.NEW_CODE,
+            config=config,
+            custom_add=combined_logs
+        )
+        
+        if result.error:
+            raise RuntimeError(result.error)
+        
+        return result.content
+    except Exception as e:
+        logger.error(f"Error in call_gpt_new_code_with_combined_logs: {str(e)}")
+        return "I encountered an error generating new code. Please try again or contact support."
