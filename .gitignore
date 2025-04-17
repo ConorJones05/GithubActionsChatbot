@@ -42,4 +42,4 @@ testing_files/
 
 __pycache__
 
-/dist
+node_modules/
