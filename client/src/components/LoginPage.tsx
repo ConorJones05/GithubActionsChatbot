@@ -26,7 +26,7 @@ function LoginPage() {
       const redirectUrl = `${window.location.origin}/api-key`;
       console.log('Using redirect URL:', redirectUrl);
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
           redirectTo: redirectUrl,
