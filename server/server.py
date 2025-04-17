@@ -29,7 +29,10 @@ app = FastAPI(title="GitHub Actions Chatbot API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://githubactionschatbot.onrender.com",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -276,4 +279,4 @@ async def generate_user_api_key(request: Request) -> ApiKeyResponse:
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate API key: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate API key: {str(e)})
