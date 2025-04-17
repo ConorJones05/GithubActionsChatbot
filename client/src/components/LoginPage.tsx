@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import LoginContainer from "./login-page/LoginContainer";
+import LoginContainer from "./LoginContainer";
 import "./LoginPage.css";
 
 function LoginPage() {
@@ -20,7 +20,7 @@ function LoginPage() {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
           redirectTo: window.location.origin,
