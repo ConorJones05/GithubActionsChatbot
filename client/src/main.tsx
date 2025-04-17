@@ -5,7 +5,6 @@ import { AuthProvider } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import ApiKeyPage from './components/ApiKeyPage';
 import ReposPage from './components/ReposPage';
-import AuthRedirectHandler from './components/AuthRedirectHandler';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -13,8 +12,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<AuthRedirectHandler />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<LoginPage />} />
           <Route path="/api-key" element={<ApiKeyPage />} />
           <Route path="/repos" element={<ReposPage />} />
         </Routes>
