@@ -214,7 +214,6 @@ Full context with additional repository information:
         return result.content
     except Exception as e:
         logger.error(f"Error in call_gpt_fix_with_combined_logs: {str(e)}")
-        # Return a fallback message if there's an error
         return "I encountered an error analyzing your logs. Please try again or contact support."
 
 
