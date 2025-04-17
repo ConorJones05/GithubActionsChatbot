@@ -20,27 +20,27 @@ function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      console.log('Login button clicked');
       setLoading(true);
       setError(null);
+
+      const redirectUrl = `${window.location.origin}/api-key`;
+      console.log('Using redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/api-key`,
-        },
+          redirectTo: redirectUrl,
+          scopes: 'read:user user:email repo',
+        }
       });
 
       if (error) {
         console.error('Login error:', error);
         setError(error.message);
-        return;
       }
-
-      console.log('Login initiated, redirecting to GitHub:', data);
     } catch (err) {
-      console.error('Unexpected error during login:', err);
-      setError('An unexpected error occurred. Please try again.');
+      console.error('Unexpected error:', err);
+      setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
