@@ -1,5 +1,5 @@
 .api-container {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -9,6 +9,7 @@
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   padding: 2rem;
+  width: 100%;
 }
 
 .api-header {
@@ -59,6 +60,7 @@
   border-radius: 0.375rem;
   padding: 0.75rem 1rem;
   margin-bottom: 0.5rem;
+  overflow-x: auto;
 }
 
 .api-key-value {
