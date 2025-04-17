@@ -20,11 +20,9 @@ import vector_logic
 import supabase_logic
 from auth_helpers import verify_auth_header
 
-# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-# Initialize FastAPI app
 app = FastAPI(title="GitHub Actions Chatbot API")
 
 app.add_middleware(
@@ -169,6 +167,12 @@ async def analyze_and_get_results(logs_packet: debug_module.LogPacket) -> Tuple[
     new_code = debug_module.call_gpt_new_code(logs_packet)
     return analysis, new_code
 
+async def analyze_and_get_results_with_combined_logs(logs_packet: debug_module.LogPacket, combined_logs: str) -> Tuple[str, str]:
+    """Generate analysis and new code using combined logs."""
+    analysis = debug_module.call_gpt_fix_with_combined_logs(logs_packet, combined_logs)
+    new_code = debug_module.call_gpt_new_code_with_combined_logs(logs_packet, combined_logs)
+    return analysis, new_code
+
 async def create_or_update_user_api_key(user_id: str) -> str:
     """Create or update an API key for a user."""
     api_key = generate_api_key()
@@ -210,14 +214,16 @@ async def analyze_logs(request: AnalyzeRequest) -> AnalysisResponse:
     logs = base64.b64decode(request.logs).decode("utf-8")
     logs_packet = debug_module.parse_logs(logs)
     
+    combined_logs = logs_packet.logs
     if request.code_context:
-        logs_packet.logs += f"\n\nCode context from repository:\n{request.code_context}"
-
+        combined_logs += f"\n\nCode context from repository:\n{request.code_context}"
+        
     error_id = str(uuid.uuid4())
-    processed_logs = vector_logic.token_checker(logs_packet.logs, "cl100k_base")
+    processed_logs = vector_logic.token_checker(combined_logs, "cl100k_base")
     error_vector = vector_logic.vector_embeddings(processed_logs)
 
-    analysis, new_code = await analyze_and_get_results(logs_packet)
+    analysis, new_code = await analyze_and_get_results_with_combined_logs(
+        logs_packet, combined_logs)
 
     old_code = ""
     file_name = logs_packet.file_name if logs_packet.file_name else "unknown"
