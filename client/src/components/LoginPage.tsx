@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import LoginContainer from "./LoginContainer";
+
 import "./LoginPage.css";
 
 function LoginPage() {
