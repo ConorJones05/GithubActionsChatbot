@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/postcss'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   css: {
     postcss: {
