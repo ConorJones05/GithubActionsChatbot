@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabaseClient';
 
+const BACKEND_URL = 'https://githubactionschatbot.onrender.com';
+
 export const apiKeyService = {
   async fetchApiKey(userId: string) {
     try {
@@ -26,7 +28,7 @@ export const apiKeyService = {
         throw new Error('No access token available');
       }
 
-      const response = await fetch('/api/generate-key', {
+      const response = await fetch(`${BACKEND_URL}/api/generate-key`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
