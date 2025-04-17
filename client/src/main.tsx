@@ -13,7 +13,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return <div>
       <div></div> 
-      {/* add the loading animation */}
     </div>;
   }
   
