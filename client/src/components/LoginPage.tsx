@@ -23,7 +23,7 @@ function LoginPage() {
       setLoading(true);
       setError(null);
 
-      const redirectUrl = `${window.location.origin}/api-key`;
+      const redirectUrl = `${window.location.origin}`;
       console.log('Using redirect URL:', redirectUrl);
 
       const { error } = await supabase.auth.signInWithOAuth({
